@@ -1,0 +1,70 @@
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.compscifinal;
+
+/**
+ *
+ * @author CMcPhail2026
+ */
+import javax.swing.*;
+import java.awt.*;
+
+public class CompSCIFINAL {
+    private JFrame frame;
+    private CardLayout cardLayout;
+    private JPanel mainPanel;
+    private LoginRegisterPanel loginRegisterPanel;
+    private GeneratorAppPanel generatorAppPanel;
+    private CsvService csvService;
+    private User currentUser;
+
+    public CompSCIFINAL() {
+        csvService = new CsvService();
+        frame = new JFrame("Password Management Tool");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(600, 500);
+        frame.setLocationRelativeTo(null); // Center the window
+
+        cardLayout = new CardLayout();
+        mainPanel = new JPanel(cardLayout);
+
+        loginRegisterPanel = new LoginRegisterPanel(this, csvService);
+        // GeneratorAppPanel is created after successful login
+        // generatorAppPanel = new GeneratorAppPanel(this, csvService);
+
+        mainPanel.add(loginRegisterPanel, "LoginRegister");
+        // mainPanel.add(generatorAppPanel, "GeneratorApp");
+
+        frame.add(mainPanel);
+        cardLayout.show(mainPanel, "LoginRegister");
+    }
+
+    public void showLoginRegisterPanel() {
+        cardLayout.show(mainPanel, "LoginRegister");
+    }
+
+    public void showGeneratorAppPanel(User user) {
+        this.currentUser = user;
+        if (generatorAppPanel == null || generatorAppPanel.getCurrentUser() != user) {
+            // Ensure a fresh panel if user changes, or create if first time
+            generatorAppPanel = new GeneratorAppPanel(this, csvService, currentUser);
+            mainPanel.add(generatorAppPanel, "GeneratorApp");
+        }
+        generatorAppPanel.loadUserPasswords(); // Refresh passwords for the new user
+        cardLayout.show(mainPanel, "GeneratorApp");
+    }
+
+    public User getCurrentUser() {
+        return currentUser;
+    }
+
+    public void start() {
+        SwingUtilities.invokeLater(() -> frame.setVisible(true));
+    }
+
+    public static void main(String[] args) {
+        new CompSCIFINAL().start();
+    }
+}
