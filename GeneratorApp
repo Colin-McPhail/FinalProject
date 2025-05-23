@@ -1,0 +1,194 @@
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.compscifinal;
+
+/**
+ *
+ * @author CMcPhail2026
+ */
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.List;
+
+public class GeneratorAppPanel extends JPanel {
+    private CompSCIFINAL mainApp;
+    private CsvService csvService;
+    private User currentUser;
+
+    private JSpinner lengthSpinner;
+    private JCheckBox upperCaseCheck, lowerCaseCheck, numbersCheck, symbolsCheck;
+    private JButton generateButton;
+    private JTextField generatedPasswordField;
+    private JLabel strengthLabel;
+
+    private JTextField passwordLabelField;
+    private JButton savePasswordButton;
+
+    private JList<PasswordEntry> savedPasswordsList;
+    private DefaultListModel<PasswordEntry> listModel;
+    private JButton refreshPasswordsButton;
+    private JButton logoutButton;
+
+
+    public GeneratorAppPanel(CompSCIFINAL mainApp, CsvService csvService, User currentUser) {
+        this.mainApp = mainApp;
+        this.csvService = csvService;
+        this.currentUser = currentUser;
+
+        setLayout(new BorderLayout(10, 10)); // Overall layout with padding
+        setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); // Padding around the panel
+
+        // --- Top Panel: Generator ---
+        JPanel generatorControlsPanel = new JPanel(new GridBagLayout());
+        generatorControlsPanel.setBorder(BorderFactory.createTitledBorder("Password Generator"));
+        GridBagConstraints gbcGen = new GridBagConstraints();
+        gbcGen.insets = new Insets(2, 5, 2, 5);
+        gbcGen.fill = GridBagConstraints.HORIZONTAL;
+        gbcGen.anchor = GridBagConstraints.WEST;
+
+        gbcGen.gridx = 0; gbcGen.gridy = 0;
+        generatorControlsPanel.add(new JLabel("Length:"), gbcGen);
+        lengthSpinner = new JSpinner(new SpinnerNumberModel(12, 8, 128, 1));
+        gbcGen.gridx = 1; gbcGen.gridy = 0; gbcGen.gridwidth = 3;
+        generatorControlsPanel.add(lengthSpinner, gbcGen);
+        gbcGen.gridwidth = 1; // reset
+
+        upperCaseCheck = new JCheckBox("Uppercase (A-Z)", true);
+        gbcGen.gridx = 0; gbcGen.gridy = 1;
+        generatorControlsPanel.add(upperCaseCheck, gbcGen);
+
+        lowerCaseCheck = new JCheckBox("Lowercase (a-z)", true);
+        gbcGen.gridx = 1; gbcGen.gridy = 1;
+        generatorControlsPanel.add(lowerCaseCheck, gbcGen);
+
+        numbersCheck = new JCheckBox("Numbers (0-9)", true);
+        gbcGen.gridx = 0; gbcGen.gridy = 2;
+        generatorControlsPanel.add(numbersCheck, gbcGen);
+
+        symbolsCheck = new JCheckBox("Symbols (!@#...)", true);
+        gbcGen.gridx = 1; gbcGen.gridy = 2;
+        generatorControlsPanel.add(symbolsCheck, gbcGen);
+
+        generateButton = new JButton("Generate");
+        gbcGen.gridx = 0; gbcGen.gridy = 3; gbcGen.gridwidth = 2;
+        gbcGen.fill = GridBagConstraints.NONE; gbcGen.anchor = GridBagConstraints.CENTER;
+        generatorControlsPanel.add(generateButton, gbcGen);
+        gbcGen.fill = GridBagConstraints.HORIZONTAL; gbcGen.anchor = GridBagConstraints.WEST; // reset
+
+        gbcGen.gridx = 0; gbcGen.gridy = 4;
+        generatorControlsPanel.add(new JLabel("Password:"), gbcGen);
+        generatedPasswordField = new JTextField(25);
+        generatedPasswordField.setEditable(false);
+        gbcGen.gridx = 1; gbcGen.gridy = 4; gbcGen.gridwidth = 3;
+        generatorControlsPanel.add(generatedPasswordField, gbcGen);
+        gbcGen.gridwidth = 1; // reset
+
+        strengthLabel = new JLabel("Strength: ");
+        gbcGen.gridx = 0; gbcGen.gridy = 5; gbcGen.gridwidth = 2;
+        generatorControlsPanel.add(strengthLabel, gbcGen);
+
+
+        // --- Center Panel: Save Current Password ---
+        JPanel savePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        savePanel.setBorder(BorderFactory.createTitledBorder("Save Current Password"));
+        savePanel.add(new JLabel("Label/Site Name:"));
+        passwordLabelField = new JTextField(15);
+        savePanel.add(passwordLabelField);
+        savePasswordButton = new JButton("Save This Password");
+        savePanel.add(savePasswordButton);
+
+
+        // --- Bottom Panel: Saved Passwords List ---
+        JPanel savedListPanel = new JPanel(new BorderLayout());
+        savedListPanel.setBorder(BorderFactory.createTitledBorder("Your Saved Passwords"));
+        listModel = new DefaultListModel<>();
+        savedPasswordsList = new JList<>(listModel);
+        JScrollPane scrollPane = new JScrollPane(savedPasswordsList);
+        savedListPanel.add(scrollPane, BorderLayout.CENTER);
+
+        JPanel bottomButtonsPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        refreshPasswordsButton = new JButton("Refresh My Passwords");
+        logoutButton = new JButton("Logout");
+        bottomButtonsPanel.add(refreshPasswordsButton);
+        bottomButtonsPanel.add(logoutButton);
+        savedListPanel.add(bottomButtonsPanel, BorderLayout.SOUTH);
+
+
+        // Add sub-panels to the main GeneratorAppPanel
+        JPanel topAndCenterPanel = new JPanel(new BorderLayout());
+        topAndCenterPanel.add(generatorControlsPanel, BorderLayout.NORTH);
+        topAndCenterPanel.add(savePanel, BorderLayout.CENTER);
+
+        add(topAndCenterPanel, BorderLayout.NORTH);
+        add(savedListPanel, BorderLayout.CENTER);
+
+
+        // Action Listeners
+        generateButton.addActionListener(e -> generateAndDisplayPassword());
+        savePasswordButton.addActionListener(e -> saveGeneratedPassword());
+        refreshPasswordsButton.addActionListener(e -> loadUserPasswords());
+        logoutButton.addActionListener(e -> {
+            this.currentUser = null; // Clear current user
+            mainApp.showLoginRegisterPanel();
+        });
+
+        loadUserPasswords(); // Initial load
+    }
+
+    private void generateAndDisplayPassword() {
+        int length = (int) lengthSpinner.getValue();
+        boolean useUpper = upperCaseCheck.isSelected();
+        boolean useLower = lowerCaseCheck.isSelected();
+        boolean useNum = numbersCheck.isSelected();
+        boolean useSym = symbolsCheck.isSelected();
+
+        String password = PasswordGenerator.generatePassword(length, useUpper, useLower, useNum, useSym);
+        generatedPasswordField.setText(password);
+
+        String strength = PasswordGenerator.getPasswordStrength(password, useUpper, useLower, useNum, useSym);
+        strengthLabel.setText("Strength: " + strength);
+    }
+
+    private void saveGeneratedPassword() {
+        String passwordToSave = generatedPasswordField.getText();
+        String label = passwordLabelField.getText();
+
+        if (currentUser == null) {
+            JOptionPane.showMessageDialog(this, "No user logged in.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        if (passwordToSave.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Generate a password first.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        if (label.trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Please provide a label for the password.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        PasswordEntry entry = new PasswordEntry(currentUser.getUsername(), label, passwordToSave);
+        csvService.savePasswordEntry(entry);
+        JOptionPane.showMessageDialog(this, "Password saved successfully for label: " + label, "Success", JOptionPane.INFORMATION_MESSAGE);
+        passwordLabelField.setText(""); // Clear label field
+        loadUserPasswords(); // Refresh the list
+    }
+
+    public void loadUserPasswords() {
+        if (currentUser == null) {
+            listModel.clear(); // Clear list if no user
+            return;
+        }
+        listModel.clear();
+        List<PasswordEntry> entries = csvService.loadPasswordEntries(currentUser.getUsername());
+        for (PasswordEntry entry : entries) {
+            listModel.addElement(entry);
+        }
+    }
+    public User getCurrentUser() {
+        return currentUser;
+    }
+}
