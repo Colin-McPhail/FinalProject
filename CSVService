@@ -1,0 +1,143 @@
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+package com.mycompany.compscifinal;
+
+/**
+ *
+ * @author CMcPhail2026
+ */
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Scanner;
+
+public class CsvService {
+    private static final String USERS_FILE = "users.csv";
+    private static final String PASSWORDS_FILE = "passwords.csv";
+
+    // --- User Management ---
+
+    public static String hashPassword(String password) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] encodedhash = digest.digest(password.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder(2 * encodedhash.length);
+            for (byte b : encodedhash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) {
+                    hexString.append('0');
+                }
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("Hashing algorithm not found", e);
+        }
+    }
+
+    public boolean registerUser(String username, String password) {
+        List<User> users = loadUsers();
+        for (User u : users) {
+            if (u.getUsername().equalsIgnoreCase(username)) {
+                return false; // Username already exists
+            }
+        }
+        String hashedPassword = hashPassword(password);
+        try (PrintWriter pw = new PrintWriter(new FileWriter(USERS_FILE, true))) {
+            pw.println(escapeCsv(username) + "," + escapeCsv(hashedPassword));
+            return true;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public User loginUser(String username, String password) {
+        List<User> users = loadUsers();
+        String hashedPassword = hashPassword(password);
+        for (User u : users) {
+            if (u.getUsername().equalsIgnoreCase(username) && u.getHashedPassword().equals(hashedPassword)) {
+                return u;
+            }
+        }
+        return null; // Login failed
+    }
+
+    private List<User> loadUsers() {
+        List<User> users = new ArrayList<>();
+        File file = new File(USERS_FILE);
+        if (!file.exists()) {
+            return users; // No users yet
+        }
+        try (Scanner scanner = new Scanner(file)) {
+            while (scanner.hasNextLine()) {
+                String line = scanner.nextLine();
+                String[] parts = line.split(",", -1); // -1 to keep trailing empty strings
+                if (parts.length == 2) {
+                    users.add(new User(unescapeCsv(parts[0]), unescapeCsv(parts[1])));
+                }
+            }
+        } catch (FileNotFoundException e) {
+            e.printStackTrace(); // Should not happen due to file.exists check
+        }
+        return users;
+    }
+
+    // --- Password Entry Management ---
+
+    public void savePasswordEntry(PasswordEntry entry) {
+        try (PrintWriter pw = new PrintWriter(new FileWriter(PASSWORDS_FILE, true))) {
+            pw.println(escapeCsv(entry.getUsername()) + "," +
+                       escapeCsv(entry.getLabel()) + "," +
+                       escapeCsv(entry.getPasswordValue()));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public List<PasswordEntry> loadPasswordEntries(String username) {
+        List<PasswordEntry> entries = new ArrayList<>();
+        File file = new File(PASSWORDS_FILE);
+        if (!file.exists()) {
+            return entries;
+        }
+        try (Scanner scanner = new Scanner(file)) {
+            while (scanner.hasNextLine()) {
+                String line = scanner.nextLine();
+                String[] parts = line.split(",", -1);
+                if (parts.length == 3) {
+                    String entryUsername = unescapeCsv(parts[0]);
+                    if (entryUsername.equalsIgnoreCase(username)) {
+                        entries.add(new PasswordEntry(entryUsername, unescapeCsv(parts[1]), unescapeCsv(parts[2])));
+                    }
+                }
+            }
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+        return entries;
+    }
+
+    // Basic CSV escaping for fields that might contain commas or quotes
+    private String escapeCsv(String data) {
+        if (data == null) return "";
+        String escapedData = data.replace("\"", "\"\"");
+        if (data.contains(",") || data.contains("\"") || data.contains("\n")) {
+            return "\"" + escapedData + "\"";
+        }
+        return escapedData;
+    }
+
+    private String unescapeCsv(String data) {
+        if (data == null) return "";
+        if (data.startsWith("\"") && data.endsWith("\"")) {
+            data = data.substring(1, data.length() - 1);
+        }
+        return data.replace("\"\"", "\"");
+    }
+}
